@@ -1,6 +1,7 @@
 const path = require('node:path');
 const { createDatabase, importExercises } = require('./db');
 const { createApp } = require('./app');
+const logger = require('./logger');
 
 const port = Number.parseInt(process.env.PORT || '3030', 10);
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -11,13 +12,14 @@ const db = createDatabase();
 const dataPath = process.env.DATA_PATH || path.join(__dirname, '..', 'data', 'exercises.json');
 const importedCount = importExercises(db, dataPath);
 const app = createApp(db);
+const dbPath = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'exercises.db');
 const server = app.listen(port, () => {
-  console.log(`Exercises API listening on http://localhost:${port}`);
-  console.log(`Imported ${importedCount} exercises into ${process.env.DB_PATH || path.join(__dirname, '..', 'data', 'exercises.db')}`);
+  logger.info('API listening', { port, url: `http://localhost:${port}` });
+  logger.info('Exercises imported', { count: importedCount, db: dbPath });
 });
 
 function shutdown(signal) {
-  console.log(`${signal} received, shutting down`);
+  logger.info('Shutting down', { signal });
   server.close(() => {
     db.close();
     process.exit(0);

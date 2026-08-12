@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const express = require('express');
 const { mountDocs } = require('./docs');
+const logger = require('./logger');
 const {
   DEFAULT_PAGE,
   DEFAULT_LIMIT,
@@ -235,10 +236,31 @@ function createApp(db) {
   app.disable('x-powered-by');
   app.use((req, res, next) => {
     const startedAt = process.hrtime.bigint();
-    const requestPath = req.originalUrl.split('?')[0];
     res.on('finish', () => {
-      const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
-      console.log(`${req.method} ${requestPath} ${res.statusCode} ${durationMs.toFixed(2)} ms`);
+      const requestPath = req.originalUrl.split('?')[0];
+      if (requestPath.startsWith('/images/') || requestPath.startsWith('/videos/')) {
+        return;
+      }
+
+      const durationMs = Number((Number(process.hrtime.bigint() - startedAt) / 1e6).toFixed(2));
+      const query = Object.keys(req.query).length ? req.query : undefined;
+      const payload = {
+        method: req.method,
+        path: requestPath,
+        status: res.statusCode,
+        duration_ms: durationMs,
+        ip: req.ip,
+        ...(query ? { query } : {}),
+      };
+      const message = `${req.method} ${requestPath} ${res.statusCode}`;
+
+      if (res.statusCode >= 500) {
+        logger.error(message, payload);
+      } else if (res.statusCode >= 400) {
+        logger.warn(message, payload);
+      } else {
+        logger.info(message, payload);
+      }
     });
     next();
   });
@@ -341,12 +363,16 @@ function createApp(db) {
     next(new HttpError(404, 'Route not found'));
   });
 
-  app.use((error, _req, res, _next) => {
+  app.use((error, req, res, _next) => {
     if (error.status) {
       return res.status(error.status).json({ error: error.message });
     }
 
-    console.error(error);
+    logger.error(error.message, {
+      method: req.method,
+      path: req.originalUrl.split('?')[0],
+      stack: error.stack,
+    });
     return res.status(500).json({ error: 'Internal server error' });
   });
 
