@@ -338,13 +338,13 @@
       </div>
       <div class="controls">
         <input class="search" id="search" type="search" placeholder="Buscar exercício, músculo ou equipamento" autocomplete="off" />
-        <select class="filter" id="category" aria-label="Categoria">
-          <option value="">Todas as categorias</option>
+        <select class="filter" id="body-part" aria-label="Parte do corpo">
+          <option value="">Todas as partes</option>
         </select>
         <select class="filter" id="equipment" aria-label="Equipamento">
           <option value="">Todos os equipamentos</option>
         </select>
-        <select class="filter" id="target" aria-label="Músculo alvo">
+        <select class="filter" id="muscle" aria-label="Músculo">
           <option value="">Todos os músculos</option>
         </select>
       </div>
@@ -377,6 +377,10 @@
 
   <script>
     const PAGE_SIZE = 24;
+    const API_BASE = /localhost:3030|127\.0\.0\.1:3030/.test(location.origin)
+      ? ""
+      : "http://localhost:3030";
+    const LANG = "pt-br";
     const LANGS = [
       { code: "pt-br", label: "Português" },
       { code: "en", label: "English" },
@@ -389,7 +393,8 @@
       totalPages: 0,
       loading: false,
       items: [],
-      query: { q: "", category: "", equipment: "", target: "" },
+      query: { q: "", body_part: "", equipment: "", muscle: "" },
+      taxonomy: { body_parts: {}, equipment: {}, muscles: {} },
     };
 
     const els = {
@@ -397,9 +402,9 @@
       spinner: document.getElementById("spinner"),
       count: document.getElementById("results-count"),
       search: document.getElementById("search"),
-      category: document.getElementById("category"),
+      bodyPart: document.getElementById("body-part"),
       equipment: document.getElementById("equipment"),
-      target: document.getElementById("target"),
+      muscle: document.getElementById("muscle"),
       clear: document.getElementById("clear-filters"),
       overlay: document.getElementById("overlay"),
       title: document.getElementById("modal-title"),
@@ -419,7 +424,7 @@
     }
 
     function hasActiveFilters() {
-      return Boolean(state.query.q || state.query.category || state.query.equipment || state.query.target);
+      return Boolean(state.query.q || state.query.body_part || state.query.equipment || state.query.muscle);
     }
 
     function setStatus(message) {
@@ -430,18 +435,41 @@
       els.grid.appendChild(status);
     }
 
-    function fillSelect(select, values, placeholder) {
+    function localized(exercise, language = LANG) {
+      return exercise.i18n?.[language] || exercise.i18n?.en || {};
+    }
+
+    function exerciseName(exercise, language = LANG) {
+      return localized(exercise, language).name || exercise.id;
+    }
+
+    function taxonomyLabel(group, slug, language = LANG) {
+      if (!slug) return "";
+      const labels = state.taxonomy[group]?.[slug];
+      return labels?.[language] || labels?.en || slug;
+    }
+
+    function muscleLabels(slugs, language = LANG) {
+      return (slugs || []).map((slug) => taxonomyLabel("muscles", slug, language));
+    }
+
+    function fillSelect(select, items, placeholder) {
       select.replaceChildren();
       const all = document.createElement("option");
       all.value = "";
       all.textContent = placeholder;
       select.appendChild(all);
-      values.forEach((value) => {
+      items.forEach((item) => {
         const option = document.createElement("option");
-        option.value = value;
-        option.textContent = value;
+        option.value = item.id;
+        option.textContent = item.labels?.[LANG] || item.id;
         select.appendChild(option);
       });
+    }
+
+    function apiUrl(path) {
+      const normalized = path.startsWith("/") ? path : `/${path}`;
+      return `${API_BASE}${normalized}`;
     }
 
     function createCard(exercise) {
@@ -453,8 +481,8 @@
       const media = document.createElement("div");
       media.className = "card-media";
       const img = document.createElement("img");
-      img.src = exercise.image;
-      img.alt = exercise.name;
+      img.src = apiUrl(exercise.media?.thumbnail);
+      img.alt = exerciseName(exercise);
       img.loading = "lazy";
       media.appendChild(img);
 
@@ -462,10 +490,12 @@
       body.className = "card-body";
       const name = document.createElement("h3");
       name.className = "card-name";
-      name.textContent = exercise.name;
+      name.textContent = exerciseName(exercise);
       const tags = document.createElement("div");
       tags.className = "card-tags";
-      [exercise.category, exercise.equipment].filter(Boolean).forEach((value) => {
+      [taxonomyLabel("body_parts", exercise.body_part), taxonomyLabel("equipment", exercise.equipment)]
+        .filter(Boolean)
+        .forEach((value) => {
         const tag = document.createElement("span");
         tag.className = "tag";
         tag.textContent = value;
@@ -506,7 +536,7 @@
       Object.entries(state.query).forEach(([key, value]) => {
         if (value) params.set(key, value);
       });
-      return `/exercises?${params}`;
+      return apiUrl(`/exercises?${params}`);
     }
 
     async function loadPage(reset) {
@@ -557,8 +587,9 @@
 
     function renderMuscles(exercise) {
       els.muscles.replaceChildren();
-      const secondary = (exercise.secondary_muscles || []).filter((name) => name && name !== exercise.target);
-      if (!exercise.target && secondary.length === 0) return;
+      const primary = muscleLabels(exercise.muscles?.primary);
+      const secondary = muscleLabels(exercise.muscles?.secondary);
+      if (primary.length === 0 && secondary.length === 0) return;
 
       const label = document.createElement("span");
       label.className = "section-label";
@@ -566,20 +597,19 @@
       const wrap = document.createElement("div");
       wrap.className = "muscles";
 
-      [exercise.target, ...secondary].filter(Boolean).forEach((name, index) => {
-        const tag = document.createElement("span");
-        tag.className = "tag";
-        tag.textContent = index === 0 ? `Principal: ${name}` : name;
-        wrap.appendChild(tag);
-      });
+      [...primary.map((name) => `Principal: ${name}`), ...secondary]
+        .forEach((text) => {
+          const tag = document.createElement("span");
+          tag.className = "tag";
+          tag.textContent = text;
+          wrap.appendChild(tag);
+        });
       els.muscles.append(label, wrap);
     }
 
     function stepsFor(exercise, code) {
-      const steps = exercise.instruction_steps?.[code];
-      if (Array.isArray(steps) && steps.length) return steps;
-      const text = exercise.instructions?.[code];
-      return text ? [text] : [];
+      const steps = exercise.i18n?.[code]?.steps;
+      return Array.isArray(steps) ? steps : [];
     }
 
     function renderInstructions(exercise) {
@@ -634,14 +664,13 @@
     }
 
     function openModal(exercise) {
-      els.title.textContent = exercise.name;
-      els.gif.src = exercise.gif_url || "";
-      els.gif.alt = exercise.name;
+      els.title.textContent = exerciseName(exercise);
+      els.gif.src = exercise.media?.animation ? apiUrl(exercise.media.animation) : "";
+      els.gif.alt = exerciseName(exercise);
       els.facts.replaceChildren();
-      addFact("Categoria", exercise.category);
-      addFact("Parte do corpo", exercise.body_part);
-      addFact("Equipamento", exercise.equipment);
-      addFact("Alvo", exercise.target);
+      addFact("Parte do corpo", taxonomyLabel("body_parts", exercise.body_part));
+      addFact("Equipamento", taxonomyLabel("equipment", exercise.equipment));
+      addFact("Alvo", muscleLabels(exercise.muscles?.primary).join(", "));
       renderMuscles(exercise);
       renderInstructions(exercise);
       els.overlay.classList.add("open");
@@ -653,31 +682,35 @@
     }
 
     async function loadFilters() {
-      const filters = await fetchJson("/filters");
-      fillSelect(els.category, filters.categories, "Todas as categorias");
+      const [filters, taxonomy] = await Promise.all([
+        fetchJson(apiUrl("/filters")),
+        fetchJson(apiUrl("/taxonomy")),
+      ]);
+      state.taxonomy = taxonomy;
+      fillSelect(els.bodyPart, filters.body_parts, "Todas as partes");
       fillSelect(els.equipment, filters.equipment, "Todos os equipamentos");
-      fillSelect(els.target, filters.targets, "Todos os músculos");
+      fillSelect(els.muscle, filters.muscles, "Todos os músculos");
     }
 
     function readFilters() {
       state.query = {
         q: els.search.value.trim(),
-        category: els.category.value,
+        body_part: els.bodyPart.value,
         equipment: els.equipment.value,
-        target: els.target.value,
+        muscle: els.muscle.value,
       };
       loadPage(true);
     }
 
     els.search.addEventListener("input", debounce(readFilters, 250));
-    els.category.addEventListener("change", readFilters);
+    els.bodyPart.addEventListener("change", readFilters);
     els.equipment.addEventListener("change", readFilters);
-    els.target.addEventListener("change", readFilters);
+    els.muscle.addEventListener("change", readFilters);
     els.clear.addEventListener("click", () => {
       els.search.value = "";
-      els.category.value = "";
+      els.bodyPart.value = "";
       els.equipment.value = "";
-      els.target.value = "";
+      els.muscle.value = "";
       readFilters();
     });
     els.grid.addEventListener("click", (event) => {
@@ -698,8 +731,9 @@
       if (entries[0].isIntersecting) loadPage(false);
     }, { rootMargin: "240px" }).observe(document.getElementById("sentinel"));
 
-    loadFilters().catch(() => {});
-    loadPage(true);
+    loadFilters()
+      .catch(() => {})
+      .finally(() => loadPage(true));
   </script>
 </body>
 </html>
