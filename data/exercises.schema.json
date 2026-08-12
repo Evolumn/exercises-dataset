@@ -2,143 +2,93 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/hasaneyldrm/exercises-dataset/blob/main/data/exercises.schema.json",
   "title": "Exercises Dataset",
-  "description": "Schema for data/exercises.json — an array of fitness exercise records with multilingual instructions and media references.",
+  "description": "Array of exercise records with stable slugs, localized content, and media references.",
   "type": "array",
   "items": {
     "$ref": "#/$defs/exercise"
   },
   "$defs": {
-    "languageMap": {
+    "localizedText": {
       "type": "object",
-      "description": "Instruction text keyed by language code.",
       "properties": {
         "en": { "type": "string" },
         "es": { "type": "string" },
         "pt-br": { "type": "string" }
       },
       "required": ["en", "es", "pt-br"],
-      "additionalProperties": { "type": "string" }
+      "additionalProperties": false
     },
-    "languageStepsMap": {
+    "localizedContent": {
       "type": "object",
-      "description": "Step-by-step instructions as an array of strings, keyed by language code.",
       "properties": {
-        "en": { "$ref": "#/$defs/steps" },
-        "es": { "$ref": "#/$defs/steps" },
-        "pt-br": { "$ref": "#/$defs/steps" }
+        "name": { "type": "string", "minLength": 1 },
+        "steps": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
       },
-      "required": ["en", "es", "pt-br"],
-      "additionalProperties": { "$ref": "#/$defs/steps" }
-    },
-    "steps": {
-      "type": "array",
-      "items": { "type": "string", "minLength": 1 }
+      "required": ["name", "steps"],
+      "additionalProperties": false
     },
     "exercise": {
       "type": "object",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique numeric identifier, zero-padded to 4 digits (e.g. \"0001\").",
           "pattern": "^[0-9]{4}$"
-        },
-        "name": {
-          "type": "string",
-          "description": "Full exercise name (e.g. \"3/4 sit-up\").",
-          "minLength": 1
-        },
-        "category": {
-          "type": "string",
-          "description": "Body part category. Mirrors body_part.",
-          "minLength": 1
         },
         "body_part": {
           "type": "string",
-          "description": "Body part targeted.",
-          "enum": [
-            "back",
-            "cardio",
-            "chest",
-            "lower arms",
-            "lower legs",
-            "neck",
-            "shoulders",
-            "upper arms",
-            "upper legs",
-            "waist"
-          ]
+          "description": "Stable body-part slug. Translated labels live in taxonomy.json."
         },
         "equipment": {
           "type": "string",
-          "description": "Required equipment (e.g. \"dumbbell\", \"body weight\").",
-          "minLength": 1
+          "description": "Stable equipment slug. Translated labels live in taxonomy.json."
         },
-        "instructions": {
-          "$ref": "#/$defs/languageMap",
-          "description": "Full step-by-step instructions as a single string per language."
+        "muscles": {
+          "type": "object",
+          "properties": {
+            "primary": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "secondary": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            }
+          },
+          "required": ["primary", "secondary"],
+          "additionalProperties": false
         },
-        "instruction_steps": {
-          "$ref": "#/$defs/languageStepsMap",
-          "description": "Same instructions split into an ordered array of steps per language."
+        "i18n": {
+          "type": "object",
+          "properties": {
+            "en": { "$ref": "#/$defs/localizedContent" },
+            "es": { "$ref": "#/$defs/localizedContent" },
+            "pt-br": { "$ref": "#/$defs/localizedContent" }
+          },
+          "required": ["en", "es", "pt-br"],
+          "additionalProperties": false
         },
-        "muscle_group": {
-          "type": "string",
-          "description": "Primary synergist muscle group.",
-          "minLength": 1
-        },
-        "secondary_muscles": {
-          "type": "array",
-          "description": "Additional muscles involved.",
-          "items": { "type": "string", "minLength": 1 }
-        },
-        "target": {
-          "type": "string",
-          "description": "Primary target muscle (e.g. \"biceps\", \"abs\").",
-          "minLength": 1
-        },
-        "media_id": {
-          "type": "string",
-          "description": "Original media reference id (e.g. \"2gPfomN\").",
-          "minLength": 1
-        },
-        "image": {
-          "type": "string",
-          "description": "Path to the 180x180 thumbnail (e.g. \"images/0001-2gPfomN.jpg\").",
-          "pattern": "^images/.+\\.(jpg|jpeg|png)$"
-        },
-        "gif_url": {
-          "type": "string",
-          "description": "Path to the 180x180 animation GIF (e.g. \"videos/0001-2gPfomN.gif\").",
-          "pattern": "^videos/.+\\.gif$"
-        },
-        "attribution": {
-          "type": "string",
-          "description": "Media copyright notice.",
-          "minLength": 1
-        },
-        "created_at": {
-          "type": "string",
-          "description": "ISO 8601 timestamp of record creation.",
-          "format": "date-time"
+        "media": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "thumbnail": {
+              "type": "string",
+              "pattern": "^images/.+\\.(jpg|jpeg|png)$"
+            },
+            "animation": {
+              "type": "string",
+              "pattern": "^videos/.+\\.gif$"
+            },
+            "attribution": { "type": "string", "minLength": 1 }
+          },
+          "required": ["id", "thumbnail", "animation", "attribution"],
+          "additionalProperties": false
         }
       },
-      "required": [
-        "id",
-        "name",
-        "category",
-        "body_part",
-        "equipment",
-        "instructions",
-        "instruction_steps",
-        "muscle_group",
-        "secondary_muscles",
-        "target",
-        "media_id",
-        "image",
-        "gif_url",
-        "attribution",
-        "created_at"
-      ],
+      "required": ["id", "body_part", "equipment", "muscles", "i18n", "media"],
       "additionalProperties": false
     }
   }

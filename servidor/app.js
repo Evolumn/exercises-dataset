@@ -1,23 +1,6 @@
+const fs = require('node:fs');
 const path = require('node:path');
 const express = require('express');
-
-const FILTER_COLUMNS = {
-  category: 'category',
-  body_part: 'body_part',
-  equipment: 'equipment',
-  muscle_group: 'muscle_group',
-  target: 'target',
-};
-
-const LANGUAGE_CODES = ['en', 'es', 'pt-br'];
-const SEARCH_COLUMNS = ['name', 'category', 'target', 'equipment', 'muscle_group'];
-
-const SELECT_COLUMNS = `
-  id, name, category, body_part, equipment,
-  instructions_en, instructions_es, instructions_pt_br, instruction_steps,
-  muscle_group, secondary_muscles, target, image, gif_url, media_id,
-  attribution, created_at
-`;
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -81,42 +64,64 @@ function parseStoredJson(value, fallback) {
 }
 
 function serializeExercise(row) {
-  const instructions = Object.fromEntries(
-    LANGUAGE_CODES.map((language) => [
-      language,
-      row[`instructions_${language.replace('-', '_')}`],
-    ]),
-  );
-
-  const instructionSteps = parseStoredJson(row.instruction_steps, {});
-
   return {
     id: row.id,
-    name: row.name,
-    category: row.category,
     body_part: row.body_part,
     equipment: row.equipment,
-    instructions_en: row.instructions_en,
-    instructions_es: row.instructions_es,
-    instructions_pt_br: row.instructions_pt_br,
-    instructions,
-    instruction_steps: Object.fromEntries(
-      LANGUAGE_CODES
-        .filter((language) => instructionSteps[language] !== undefined)
-        .map((language) => [language, instructionSteps[language]]),
-    ),
-    muscle_group: row.muscle_group,
-    secondary_muscles: parseStoredJson(row.secondary_muscles, []),
-    target: row.target,
-    image: row.image,
-    gif_url: row.gif_url,
-    media_id: row.media_id,
-    attribution: row.attribution,
-    created_at: row.created_at,
+    muscles: parseStoredJson(row.muscles, { primary: [], secondary: [] }),
+    i18n: parseStoredJson(row.i18n, {}),
+    media: parseStoredJson(row.media, {}),
   };
 }
 
-function buildFilters(query) {
+function slugsMatchingSearch(dictionary, searchTerm) {
+  const needle = searchTerm.toLowerCase();
+  return Object.entries(dictionary || {})
+    .filter(([, labels]) => Object.values(labels || {}).some((label) => String(label).toLowerCase().includes(needle)))
+    .map(([id]) => id);
+}
+
+function buildSearchClause(searchTerm, taxonomy) {
+  const like = `%${escapeLike(searchTerm)}%`;
+  const parts = [
+    `LOWER(i18n) LIKE LOWER(?) ESCAPE '\\'`,
+    `LOWER(body_part) LIKE LOWER(?) ESCAPE '\\'`,
+    `LOWER(equipment) LIKE LOWER(?) ESCAPE '\\'`,
+    `LOWER(muscles) LIKE LOWER(?) ESCAPE '\\'`,
+  ];
+  const params = [like, like, like, like];
+
+  const bodyParts = slugsMatchingSearch(taxonomy.body_parts, searchTerm);
+  if (bodyParts.length > 0) {
+    parts.push(`body_part IN (${bodyParts.map(() => '?').join(', ')})`);
+    params.push(...bodyParts);
+  }
+
+  const equipment = slugsMatchingSearch(taxonomy.equipment, searchTerm);
+  if (equipment.length > 0) {
+    parts.push(`equipment IN (${equipment.map(() => '?').join(', ')})`);
+    params.push(...equipment);
+  }
+
+  const muscles = slugsMatchingSearch(taxonomy.muscles, searchTerm);
+  if (muscles.length > 0) {
+    const muscleClause = muscles.map(() => `(
+      EXISTS (SELECT 1 FROM json_each(json_extract(muscles, '$.primary')) WHERE value = ?)
+      OR EXISTS (SELECT 1 FROM json_each(json_extract(muscles, '$.secondary')) WHERE value = ?)
+    )`).join(' OR ');
+    parts.push(`(${muscleClause})`);
+    for (const muscle of muscles) {
+      params.push(muscle, muscle);
+    }
+  }
+
+  return {
+    sql: `(${parts.join(' OR ')})`,
+    params,
+  };
+}
+
+function buildFilters(query, taxonomy) {
   const clauses = [];
   const params = [];
 
@@ -128,19 +133,31 @@ function buildFilters(query) {
 
     const searchTerm = search.trim();
     if (searchTerm) {
-      clauses.push(`(${SEARCH_COLUMNS.map((column) => `LOWER(${column}) LIKE LOWER(?) ESCAPE '\\'`).join(' OR ')})`);
-      params.push(...SEARCH_COLUMNS.map(() => `%${escapeLike(searchTerm)}%`));
+      const searchClause = buildSearchClause(searchTerm, taxonomy);
+      clauses.push(searchClause.sql);
+      params.push(...searchClause.params);
     }
   }
 
-  for (const [queryKey, column] of Object.entries(FILTER_COLUMNS)) {
-    const values = getFilterValues(query, queryKey);
+  for (const column of ['body_part', 'equipment']) {
+    const values = getFilterValues(query, column);
     if (values.length === 0) {
       continue;
     }
+    clauses.push(`(${values.map(() => `${column} = ?`).join(' OR ')})`);
+    params.push(...values);
+  }
 
-    clauses.push(`(${values.map(() => `LOWER(${column}) LIKE LOWER(?) ESCAPE '\\'`).join(' OR ')})`);
-    params.push(...values.map((value) => `%${escapeLike(value)}%`));
+  const muscles = getFilterValues(query, 'muscle');
+  if (muscles.length > 0) {
+    const muscleClause = muscles.map(() => `(
+      EXISTS (SELECT 1 FROM json_each(json_extract(muscles, '$.primary')) WHERE value = ?)
+      OR EXISTS (SELECT 1 FROM json_each(json_extract(muscles, '$.secondary')) WHERE value = ?)
+    )`).join(' OR ');
+    clauses.push(`(${muscleClause})`);
+    for (const muscle of muscles) {
+      params.push(muscle, muscle);
+    }
   }
 
   return {
@@ -172,8 +189,22 @@ function createCorsMiddleware() {
   };
 }
 
+function loadTaxonomy(projectRoot) {
+  const taxonomyPath = path.join(projectRoot, 'data', 'taxonomy.json');
+  return JSON.parse(fs.readFileSync(taxonomyPath, 'utf8'));
+}
+
+function labeledValues(ids, dictionary) {
+  return ids.map((id) => ({
+    id,
+    labels: dictionary[id] || { en: id, es: id, 'pt-br': id },
+  }));
+}
+
 function createApp(db) {
   const app = express();
+  const projectRoot = path.join(__dirname, '..');
+  const taxonomy = loadTaxonomy(projectRoot);
 
   app.disable('x-powered-by');
   app.use((req, res, next) => {
@@ -185,7 +216,6 @@ function createApp(db) {
     });
     next();
   });
-  const projectRoot = path.join(__dirname, '..');
 
   app.use(createCorsMiddleware());
   app.use(express.json({ limit: '1mb' }));
@@ -199,7 +229,7 @@ function createApp(db) {
   });
 
   app.get('/exercises/random', (req, res) => {
-    const row = db.prepare(`SELECT ${SELECT_COLUMNS} FROM exercises ORDER BY RANDOM() LIMIT 1`).get();
+    const row = db.prepare('SELECT * FROM exercises ORDER BY RANDOM() LIMIT 1').get();
     if (!row) {
       throw new HttpError(404, 'Exercise not found');
     }
@@ -207,7 +237,7 @@ function createApp(db) {
   });
 
   app.get('/exercises/:id', (req, res) => {
-    const row = db.prepare(`SELECT ${SELECT_COLUMNS} FROM exercises WHERE id = ?`).get(req.params.id);
+    const row = db.prepare('SELECT * FROM exercises WHERE id = ?').get(req.params.id);
     if (!row) {
       throw new HttpError(404, 'Exercise not found');
     }
@@ -225,11 +255,10 @@ function createApp(db) {
       throw new HttpError(400, 'page is too large');
     }
 
-    const filters = buildFilters(req.query);
+    const filters = buildFilters(req.query, taxonomy);
     const total = db.prepare(`SELECT COUNT(*) AS total FROM exercises ${filters.sql}`).get(...filters.params).total;
     const rows = db.prepare(`
-      SELECT ${SELECT_COLUMNS}
-      FROM exercises
+      SELECT * FROM exercises
       ${filters.sql}
       ORDER BY id
       LIMIT ? OFFSET ?
@@ -254,21 +283,35 @@ function createApp(db) {
     return rows.map((row) => row.value);
   };
 
-  const distinctRoute = (column) => (_req, res) => {
-    res.json(getDistinctValues(column));
+  const getDistinctMuscles = () => {
+    const rows = db.prepare(`
+      SELECT DISTINCT value
+      FROM exercises, json_each(json_extract(muscles, '$.primary'))
+      UNION
+      SELECT DISTINCT value
+      FROM exercises, json_each(json_extract(muscles, '$.secondary'))
+      ORDER BY 1 COLLATE NOCASE
+    `).all();
+    return rows.map((row) => row.value);
   };
 
-  app.get('/categories', distinctRoute('category'));
-  app.get('/body-parts', distinctRoute('body_part'));
-  app.get('/equipment', distinctRoute('equipment'));
-  app.get('/targets', distinctRoute('target'));
+  app.get('/taxonomy', (_req, res) => {
+    res.json(taxonomy);
+  });
+  app.get('/body-parts', (_req, res) => {
+    res.json(labeledValues(getDistinctValues('body_part'), taxonomy.body_parts));
+  });
+  app.get('/equipment', (_req, res) => {
+    res.json(labeledValues(getDistinctValues('equipment'), taxonomy.equipment));
+  });
+  app.get('/muscles', (_req, res) => {
+    res.json(labeledValues(getDistinctMuscles(), taxonomy.muscles));
+  });
   app.get('/filters', (_req, res) => {
     res.json({
-      categories: getDistinctValues('category'),
-      body_parts: getDistinctValues('body_part'),
-      equipment: getDistinctValues('equipment'),
-      muscle_groups: getDistinctValues('muscle_group'),
-      targets: getDistinctValues('target'),
+      body_parts: labeledValues(getDistinctValues('body_part'), taxonomy.body_parts),
+      equipment: labeledValues(getDistinctValues('equipment'), taxonomy.equipment),
+      muscles: labeledValues(getDistinctMuscles(), taxonomy.muscles),
     });
   });
 

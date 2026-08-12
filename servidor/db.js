@@ -3,46 +3,21 @@ const path = require('node:path');
 const Database = require('better-sqlite3');
 
 const PROJECT_ROOT = path.join(__dirname, '..');
+const LANGUAGES = ['en', 'es', 'pt-br'];
 
 const CREATE_SCHEMA = `
   CREATE TABLE IF NOT EXISTS exercises (
     id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    category TEXT,
     body_part TEXT,
     equipment TEXT,
-    instructions_en TEXT,
-    instructions_es TEXT,
-    instructions_pt_br TEXT,
-    instruction_steps TEXT NOT NULL DEFAULT '{}',
-    muscle_group TEXT,
-    secondary_muscles TEXT NOT NULL DEFAULT '[]',
-    target TEXT,
-    image TEXT,
-    gif_url TEXT,
-    media_id TEXT,
-    attribution TEXT,
-    created_at TEXT
+    muscles TEXT NOT NULL DEFAULT '{"primary":[],"secondary":[]}',
+    i18n TEXT NOT NULL DEFAULT '{}',
+    media TEXT NOT NULL DEFAULT '{}'
   );
 
-  CREATE INDEX IF NOT EXISTS exercises_category_idx ON exercises(category);
   CREATE INDEX IF NOT EXISTS exercises_body_part_idx ON exercises(body_part);
   CREATE INDEX IF NOT EXISTS exercises_equipment_idx ON exercises(equipment);
-  CREATE INDEX IF NOT EXISTS exercises_muscle_group_idx ON exercises(muscle_group);
-  CREATE INDEX IF NOT EXISTS exercises_target_idx ON exercises(target);
 `;
-
-const INSTRUCTION_LANGUAGES = ['en', 'es', 'pt-br'];
-const REMOVED_INSTRUCTION_COLUMNS = [
-  'instructions_it',
-  'instructions_tr',
-  'instructions_ru',
-  'instructions_zh',
-  'instructions_hi',
-  'instructions_pl',
-  'instructions_ko',
-  'instructions_fr',
-];
 
 function resolvePath(value, fallback) {
   if (value && path.isAbsolute(value)) {
@@ -61,25 +36,22 @@ function createDatabase(databasePath = process.env.DB_PATH || './data/exercises.
   const db = new Database(resolvedPath);
   db.pragma('journal_mode = WAL');
   db.pragma('busy_timeout = 5000');
-  db.exec(CREATE_SCHEMA);
-  migrateInstructionColumns(db);
+  ensureSchema(db);
   return db;
 }
 
-function migrateInstructionColumns(db) {
-  const columns = new Set(db.prepare('PRAGMA table_info(exercises)').all().map((column) => column.name));
-  const columnsToRemove = REMOVED_INSTRUCTION_COLUMNS.filter((column) => columns.has(column));
+function ensureSchema(db) {
+  const columns = new Set(
+    db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'exercises'").get()
+      ? db.prepare('PRAGMA table_info(exercises)').all().map((column) => column.name)
+      : [],
+  );
 
-  if (columnsToRemove.length === 0) {
-    return;
+  if (columns.size > 0 && !columns.has('i18n')) {
+    db.exec('DROP TABLE IF EXISTS exercises');
   }
 
-  const migrate = db.transaction(() => {
-    for (const column of columnsToRemove) {
-      db.exec(`ALTER TABLE exercises DROP COLUMN ${column}`);
-    }
-  });
-  migrate();
+  db.exec(CREATE_SCHEMA);
 }
 
 function asJson(value, fallback) {
@@ -92,7 +64,7 @@ function onlyAllowedLanguages(value) {
   }
 
   return Object.fromEntries(
-    INSTRUCTION_LANGUAGES
+    LANGUAGES
       .filter((language) => value[language] !== undefined)
       .map((language) => [language, value[language]]),
   );
@@ -100,74 +72,39 @@ function onlyAllowedLanguages(value) {
 
 function importExercises(db, dataPath = process.env.DATA_PATH || './data/exercises.json') {
   const resolvedPath = resolvePath(dataPath);
-  const rawData = fs.readFileSync(resolvedPath, 'utf8');
-  const exercises = JSON.parse(rawData);
+  const exercises = JSON.parse(fs.readFileSync(resolvedPath, 'utf8'));
 
   if (!Array.isArray(exercises)) {
     throw new Error('The exercise data file must contain a JSON array');
   }
 
   const upsert = db.prepare(`
-    INSERT INTO exercises (
-      id, name, category, body_part, equipment,
-      instructions_en, instructions_es, instructions_pt_br, instruction_steps,
-      muscle_group, secondary_muscles, target, image, gif_url, media_id,
-      attribution, created_at
-    ) VALUES (
-      @id, @name, @category, @body_part, @equipment,
-      @instructions_en, @instructions_es, @instructions_pt_br, @instruction_steps,
-      @muscle_group, @secondary_muscles, @target, @image, @gif_url, @media_id,
-      @attribution, @created_at
-    )
+    INSERT INTO exercises (id, body_part, equipment, muscles, i18n, media)
+    VALUES (@id, @body_part, @equipment, @muscles, @i18n, @media)
     ON CONFLICT(id) DO UPDATE SET
-      name = excluded.name,
-      category = excluded.category,
       body_part = excluded.body_part,
       equipment = excluded.equipment,
-      instructions_en = excluded.instructions_en,
-      instructions_es = excluded.instructions_es,
-      instructions_pt_br = excluded.instructions_pt_br,
-      instruction_steps = excluded.instruction_steps,
-      muscle_group = excluded.muscle_group,
-      secondary_muscles = excluded.secondary_muscles,
-      target = excluded.target,
-      image = excluded.image,
-      gif_url = excluded.gif_url,
-      media_id = excluded.media_id,
-      attribution = excluded.attribution,
-      created_at = excluded.created_at
+      muscles = excluded.muscles,
+      i18n = excluded.i18n,
+      media = excluded.media
   `);
 
   const insertAll = db.transaction((records) => {
     for (const exercise of records) {
-      if (!exercise || typeof exercise.id !== 'string' || !exercise.id || typeof exercise.name !== 'string') {
-        throw new Error('Every exercise must have a string id and name');
+      if (!exercise || typeof exercise.id !== 'string' || !exercise.id) {
+        throw new Error('Every exercise must have a string id');
       }
-
-      const instructions = exercise.instructions || {};
-      const instructionValues = Object.fromEntries(
-        INSTRUCTION_LANGUAGES.map((language) => [
-          `instructions_${language.replace('-', '_')}`,
-          instructions[language] ?? null,
-        ]),
-      );
+      if (!exercise.i18n?.['pt-br']?.name) {
+        throw new Error(`Exercise ${exercise.id} must have i18n.pt-br.name`);
+      }
 
       upsert.run({
         id: exercise.id,
-        name: exercise.name,
-        category: exercise.category ?? null,
         body_part: exercise.body_part ?? null,
         equipment: exercise.equipment ?? null,
-        ...instructionValues,
-        instruction_steps: asJson(onlyAllowedLanguages(exercise.instruction_steps), {}),
-        muscle_group: exercise.muscle_group ?? null,
-        secondary_muscles: asJson(exercise.secondary_muscles, []),
-        target: exercise.target ?? null,
-        image: exercise.image ?? null,
-        gif_url: exercise.gif_url ?? null,
-        media_id: exercise.media_id ?? null,
-        attribution: exercise.attribution ?? null,
-        created_at: exercise.created_at ?? null,
+        muscles: asJson(exercise.muscles, { primary: [], secondary: [] }),
+        i18n: asJson(onlyAllowedLanguages(exercise.i18n), {}),
+        media: asJson(exercise.media, {}),
       });
     }
   });

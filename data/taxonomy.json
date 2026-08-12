@@ -1,0 +1,413 @@
+{
+  "body_parts": {
+    "back": {
+      "en": "back",
+      "es": "espalda",
+      "pt-br": "costas"
+    },
+    "cardio": {
+      "en": "cardio",
+      "es": "cardio",
+      "pt-br": "cardio"
+    },
+    "chest": {
+      "en": "chest",
+      "es": "pecho",
+      "pt-br": "peito"
+    },
+    "lower_arms": {
+      "en": "lower arms",
+      "es": "antebrazos",
+      "pt-br": "antebraços"
+    },
+    "lower_legs": {
+      "en": "lower legs",
+      "es": "pantorrillas",
+      "pt-br": "panturrilhas"
+    },
+    "neck": {
+      "en": "neck",
+      "es": "cuello",
+      "pt-br": "pescoço"
+    },
+    "shoulders": {
+      "en": "shoulders",
+      "es": "hombros",
+      "pt-br": "ombros"
+    },
+    "upper_arms": {
+      "en": "upper arms",
+      "es": "brazos",
+      "pt-br": "braços"
+    },
+    "upper_legs": {
+      "en": "upper legs",
+      "es": "muslos",
+      "pt-br": "coxas"
+    },
+    "waist": {
+      "en": "waist",
+      "es": "cintura",
+      "pt-br": "cintura"
+    }
+  },
+  "equipment": {
+    "assisted": {
+      "en": "assisted",
+      "es": "asistido",
+      "pt-br": "assistido"
+    },
+    "band": {
+      "en": "band",
+      "es": "banda",
+      "pt-br": "faixa"
+    },
+    "barbell": {
+      "en": "barbell",
+      "es": "barra",
+      "pt-br": "barra"
+    },
+    "body_weight": {
+      "en": "body weight",
+      "es": "peso corporal",
+      "pt-br": "peso corporal"
+    },
+    "bosu_ball": {
+      "en": "bosu ball",
+      "es": "bosu",
+      "pt-br": "bosu"
+    },
+    "cable": {
+      "en": "cable",
+      "es": "polea",
+      "pt-br": "polia"
+    },
+    "dumbbell": {
+      "en": "dumbbell",
+      "es": "mancuernas",
+      "pt-br": "halteres"
+    },
+    "elliptical_machine": {
+      "en": "elliptical machine",
+      "es": "elíptica",
+      "pt-br": "elíptico"
+    },
+    "ez_barbell": {
+      "en": "ez barbell",
+      "es": "barra EZ",
+      "pt-br": "barra W"
+    },
+    "hammer": {
+      "en": "hammer",
+      "es": "martillo",
+      "pt-br": "martelo"
+    },
+    "kettlebell": {
+      "en": "kettlebell",
+      "es": "pesa rusa",
+      "pt-br": "kettlebell"
+    },
+    "leverage_machine": {
+      "en": "leverage machine",
+      "es": "máquina de palanca",
+      "pt-br": "máquina de alavanca"
+    },
+    "medicine_ball": {
+      "en": "medicine ball",
+      "es": "balón medicinal",
+      "pt-br": "bola medicinal"
+    },
+    "olympic_barbell": {
+      "en": "olympic barbell",
+      "es": "barra olímpica",
+      "pt-br": "barra olímpica"
+    },
+    "resistance_band": {
+      "en": "resistance band",
+      "es": "banda elástica",
+      "pt-br": "elástico"
+    },
+    "roller": {
+      "en": "roller",
+      "es": "rodillo",
+      "pt-br": "rolo"
+    },
+    "rope": {
+      "en": "rope",
+      "es": "cuerda",
+      "pt-br": "corda"
+    },
+    "skierg_machine": {
+      "en": "skierg machine",
+      "es": "SkiErg",
+      "pt-br": "SkiErg"
+    },
+    "sled_machine": {
+      "en": "sled machine",
+      "es": "trineo",
+      "pt-br": "trenó"
+    },
+    "smith_machine": {
+      "en": "smith machine",
+      "es": "máquina Smith",
+      "pt-br": "máquina Smith"
+    },
+    "stability_ball": {
+      "en": "stability ball",
+      "es": "pelota suiza",
+      "pt-br": "bola suíça"
+    },
+    "stationary_bike": {
+      "en": "stationary bike",
+      "es": "bicicleta estática",
+      "pt-br": "bicicleta ergométrica"
+    },
+    "stepmill_machine": {
+      "en": "stepmill machine",
+      "es": "stepmill",
+      "pt-br": "escada ergométrica"
+    },
+    "tire": {
+      "en": "tire",
+      "es": "neumático",
+      "pt-br": "pneu"
+    },
+    "trap_bar": {
+      "en": "trap bar",
+      "es": "barra hexagonal",
+      "pt-br": "barra hexagonal"
+    },
+    "upper_body_ergometer": {
+      "en": "upper body ergometer",
+      "es": "ergómetro de tren superior",
+      "pt-br": "ergômetro de membros superiores"
+    },
+    "weighted": {
+      "en": "weighted",
+      "es": "con peso",
+      "pt-br": "com peso"
+    },
+    "wheel_roller": {
+      "en": "wheel roller",
+      "es": "rueda abdominal",
+      "pt-br": "roda abdominal"
+    }
+  },
+  "muscles": {
+    "abs": {
+      "en": "abs",
+      "es": "abdomen",
+      "pt-br": "abdômen"
+    },
+    "abductors": {
+      "en": "abductors",
+      "es": "abductores",
+      "pt-br": "abdutores"
+    },
+    "adductors": {
+      "en": "adductors",
+      "es": "aductores",
+      "pt-br": "adutores"
+    },
+    "ankle_stabilizers": {
+      "en": "ankle stabilizers",
+      "es": "estabilizadores del tobillo",
+      "pt-br": "estabilizadores do tornozelo"
+    },
+    "ankles": {
+      "en": "ankles",
+      "es": "tobillos",
+      "pt-br": "tornozelos"
+    },
+    "back": {
+      "en": "back",
+      "es": "espalda",
+      "pt-br": "costas"
+    },
+    "biceps": {
+      "en": "biceps",
+      "es": "bíceps",
+      "pt-br": "bíceps"
+    },
+    "brachialis": {
+      "en": "brachialis",
+      "es": "braquial",
+      "pt-br": "braquial"
+    },
+    "calves": {
+      "en": "calves",
+      "es": "gemelos",
+      "pt-br": "panturrilhas"
+    },
+    "cardiovascular_system": {
+      "en": "cardiovascular system",
+      "es": "sistema cardiovascular",
+      "pt-br": "sistema cardiovascular"
+    },
+    "core": {
+      "en": "core",
+      "es": "core",
+      "pt-br": "core"
+    },
+    "deltoids": {
+      "en": "deltoids",
+      "es": "deltoides",
+      "pt-br": "deltoides"
+    },
+    "feet": {
+      "en": "feet",
+      "es": "pies",
+      "pt-br": "pés"
+    },
+    "forearms": {
+      "en": "forearms",
+      "es": "antebrazos",
+      "pt-br": "antebraços"
+    },
+    "glutes": {
+      "en": "glutes",
+      "es": "glúteos",
+      "pt-br": "glúteos"
+    },
+    "grip_muscles": {
+      "en": "grip muscles",
+      "es": "músculos del agarre",
+      "pt-br": "músculos da pegada"
+    },
+    "groin": {
+      "en": "groin",
+      "es": "ingle",
+      "pt-br": "virilha"
+    },
+    "hamstrings": {
+      "en": "hamstrings",
+      "es": "isquiotibiales",
+      "pt-br": "posteriores"
+    },
+    "hands": {
+      "en": "hands",
+      "es": "manos",
+      "pt-br": "mãos"
+    },
+    "hip_flexors": {
+      "en": "hip flexors",
+      "es": "flexores de cadera",
+      "pt-br": "flexores do quadril"
+    },
+    "inner_thighs": {
+      "en": "inner thighs",
+      "es": "muslos internos",
+      "pt-br": "parte interna da coxa"
+    },
+    "latissimus_dorsi": {
+      "en": "latissimus dorsi",
+      "es": "dorsal ancho",
+      "pt-br": "dorsais"
+    },
+    "levator_scapulae": {
+      "en": "levator scapulae",
+      "es": "elevador de la escápula",
+      "pt-br": "elevador da escápula"
+    },
+    "lower_back": {
+      "en": "lower back",
+      "es": "lumbar",
+      "pt-br": "lombar"
+    },
+    "obliques": {
+      "en": "obliques",
+      "es": "oblicuos",
+      "pt-br": "oblíquos"
+    },
+    "pectorals": {
+      "en": "pectorals",
+      "es": "pectorales",
+      "pt-br": "peitorais"
+    },
+    "quadriceps": {
+      "en": "quadriceps",
+      "es": "cuádriceps",
+      "pt-br": "quadríceps"
+    },
+    "rear_deltoids": {
+      "en": "rear deltoids",
+      "es": "deltoides posterior",
+      "pt-br": "deltoide posterior"
+    },
+    "rhomboids": {
+      "en": "rhomboids",
+      "es": "romboides",
+      "pt-br": "romboides"
+    },
+    "rotator_cuff": {
+      "en": "rotator cuff",
+      "es": "manguito rotador",
+      "pt-br": "manguito rotador"
+    },
+    "serratus_anterior": {
+      "en": "serratus anterior",
+      "es": "serrato anterior",
+      "pt-br": "serrátil anterior"
+    },
+    "shins": {
+      "en": "shins",
+      "es": "espinillas",
+      "pt-br": "tibiais"
+    },
+    "shoulders": {
+      "en": "shoulders",
+      "es": "hombros",
+      "pt-br": "ombros"
+    },
+    "soleus": {
+      "en": "soleus",
+      "es": "sóleo",
+      "pt-br": "sóleo"
+    },
+    "spine": {
+      "en": "spine",
+      "es": "columna",
+      "pt-br": "coluna"
+    },
+    "sternocleidomastoid": {
+      "en": "sternocleidomastoid",
+      "es": "esternocleidomastoideo",
+      "pt-br": "esternocleidomastoideo"
+    },
+    "trapezius": {
+      "en": "trapezius",
+      "es": "trapecio",
+      "pt-br": "trapézio"
+    },
+    "triceps": {
+      "en": "triceps",
+      "es": "tríceps",
+      "pt-br": "tríceps"
+    },
+    "upper_back": {
+      "en": "upper back",
+      "es": "espalda alta",
+      "pt-br": "costas superiores"
+    },
+    "upper_chest": {
+      "en": "upper chest",
+      "es": "pectoral superior",
+      "pt-br": "peito superior"
+    },
+    "wrist_extensors": {
+      "en": "wrist extensors",
+      "es": "extensores de muñeca",
+      "pt-br": "extensores do punho"
+    },
+    "wrist_flexors": {
+      "en": "wrist flexors",
+      "es": "flexores de muñeca",
+      "pt-br": "flexores do punho"
+    },
+    "wrists": {
+      "en": "wrists",
+      "es": "muñecas",
+      "pt-br": "punhos"
+    }
+  }
+}
