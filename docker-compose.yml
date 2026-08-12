@@ -2,11 +2,10 @@ services:
   api:
     build: .
     image: exercises-api:1.0.0
-    container_name: exercises-api
     restart: unless-stopped
     init: true
-    ports:
-      - "3030:3030"
+    expose:
+      - "3030"
     environment:
       NODE_ENV: production
       PORT: "3030"
@@ -15,6 +14,10 @@ services:
       # ALLOWED_ORIGINS: https://seu-dominio.com
     volumes:
       - exercises-db:/data
+    networks:
+      - dokploy-network
+    labels:
+      - traefik.docker.network=dokploy-network
     healthcheck:
       test:
         [
@@ -30,3 +33,7 @@ services:
 
 volumes:
   exercises-db:
+
+networks:
+  dokploy-network:
+    external: true
