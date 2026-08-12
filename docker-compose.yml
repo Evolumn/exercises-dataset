@@ -1,0 +1,32 @@
+services:
+  api:
+    build: .
+    image: exercises-api:1.0.0
+    container_name: exercises-api
+    restart: unless-stopped
+    init: true
+    ports:
+      - "3030:3030"
+    environment:
+      NODE_ENV: production
+      PORT: "3030"
+      DB_PATH: /data/exercises.db
+      DATA_PATH: /app/data/exercises.json
+      # ALLOWED_ORIGINS: https://seu-dominio.com
+    volumes:
+      - exercises-db:/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3030/exercises?limit=1').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+volumes:
+  exercises-db:
