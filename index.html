@@ -683,13 +683,13 @@
 
     async function loadFilters() {
       const [filters, taxonomy] = await Promise.all([
-        fetchJson(apiUrl("/filters")),
-        fetchJson(apiUrl("/taxonomy")),
+        fetchJson(apiUrl("/filters?limit=100")),
+        fetchJson(apiUrl("/taxonomy?limit=100")),
       ]);
-      state.taxonomy = taxonomy;
-      fillSelect(els.bodyPart, filters.body_parts, "Todas as partes");
-      fillSelect(els.equipment, filters.equipment, "Todos os equipamentos");
-      fillSelect(els.muscle, filters.muscles, "Todos os músculos");
+      state.taxonomy = taxonomy.data;
+      fillSelect(els.bodyPart, filters.data.body_parts, "Todas as partes");
+      fillSelect(els.equipment, filters.data.equipment, "Todos os equipamentos");
+      fillSelect(els.muscle, filters.data.muscles, "Todos os músculos");
     }
 
     function readFilters() {

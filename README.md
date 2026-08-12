@@ -41,11 +41,12 @@ npm install
 npm start
 ```
 
-Abra [http://localhost:3030](http://localhost:3030). O primeiro start cria `data/exercises.db` e importa `data/exercises.json`.
+Abra [http://localhost:3030](http://localhost:3030). Documentação interativa (Scalar): [http://localhost:3030/docs](http://localhost:3030/docs). O primeiro start cria `data/exercises.db` e importa `data/exercises.json`.
 
 | Ferramenta | Função |
 |---|---|
 | `index.html` | Explorador com busca, filtros e infinite scroll |
+| `/docs` | Referência interativa Scalar da API |
 | `setup.html` | Guia de importação SQL e exemplos de cliente |
 
 Variáveis de ambiente: `PORT` (padrão `3030`), `DB_PATH`, `DATA_PATH`, `ALLOWED_ORIGINS`. Para só importar o banco: `npm run import`.
@@ -70,7 +71,7 @@ Cada item de `data/exercises.json` segue [`data/exercises.schema.json`](data/exe
 
 | Campo | Tipo | Descrição |
 |---|---|---|
-| `id` | `string` | Identificador `"0001"`–`"1324"` |
+| `id` | `string` | UUID v4 do exercício |
 | `body_part` | `string` | Slug da parte do corpo |
 | `equipment` | `string` | Slug do equipamento |
 | `muscles.primary` | `string[]` | Slugs dos músculos principais |
@@ -82,9 +83,11 @@ Cada item de `data/exercises.json` segue [`data/exercises.schema.json`](data/exe
 | `media.animation` | `string` | GIF 180×180 (`videos/…gif`) |
 | `media.attribution` | `string` | `© Gym visual — https://gymvisual.com/` |
 
+O `id` do exercício é UUID v4. Os arquivos em `images/` e `videos/` mantêm o prefixo numérico original (`0001-2gPfomN.jpg`).
+
 ```json
 {
-  "id": "0001",
+  "id": "7e17c4aa-9f2e-415e-8f9d-68789cf30570",
   "body_part": "waist",
   "equipment": "body_weight",
   "muscles": {
@@ -163,27 +166,50 @@ A taxonomia mapeia os slugs:
 
 ## API
 
-Express + SQLite. Endpoints de vocabulário devolvem `{ id, labels: { en, es, pt-br } }`.
+Express + SQLite. Todo endpoint de coleção devolve o mesmo envelope de paginação. Endpoints de vocabulário usam `{ id, labels: { en, es, pt-br } }` dentro de `data`.
 
 | Método | Rota | Descrição |
 |---|---|---|
+| `GET` | `/docs` | Referência Scalar ([scalar.com](https://scalar.com/)) |
+| `GET` | `/openapi.yaml` | Spec OpenAPI 3.1 |
 | `GET` | `/exercises` | Lista paginada |
-| `GET` | `/exercises/:id` | Um exercício |
+| `GET` | `/exercises/:id` | Um exercício (UUID) |
 | `GET` | `/exercises/random` | Aleatório |
-| `GET` | `/taxonomy` | Dicionário completo |
-| `GET` | `/filters` | Valores distintos com rótulos |
-| `GET` | `/body-parts` | Partes do corpo |
-| `GET` | `/equipment` | Equipamentos |
-| `GET` | `/muscles` | Músculos |
+| `GET` | `/taxonomy` | Dicionário paginado |
+| `GET` | `/filters` | Valores distintos com rótulos, paginado |
+| `GET` | `/body-parts` | Partes do corpo, paginado |
+| `GET` | `/equipment` | Equipamentos, paginado |
+| `GET` | `/muscles` | Músculos, paginado |
 | `GET` | `/images/<arquivo>.jpg` | Thumbnail |
 | `GET` | `/videos/<arquivo>.gif` | Animação |
 
-Query de `/exercises`:
+### Paginação
+
+Vale para `/exercises`, `/taxonomy`, `/filters`, `/body-parts`, `/equipment` e `/muscles`.
 
 | Param | Padrão | Notas |
 |---|---|---|
 | `page` | `1` | Inteiro ≥ 1 |
 | `limit` | `20` | Máximo `100` |
+
+Envelope:
+
+```json
+{
+  "data": [],
+  "total": 0,
+  "page": 1,
+  "limit": 20,
+  "totalPages": 0
+}
+```
+
+Em `/filters` e `/taxonomy`, `data` é um objeto `{ body_parts, equipment, muscles }`. Cada grupo é fatiado com o mesmo `page`/`limit`; `total` é o maior dos três grupos.
+
+Filtros extras só em `/exercises`:
+
+| Param | Padrão | Notas |
+|---|---|---|
 | `q` | — | Busca em nome, passos, slugs e rótulos da taxonomia |
 | `body_part` | — | Slug; vários via vírgula |
 | `equipment` | — | Slug; vários via vírgula |
@@ -192,20 +218,36 @@ Query de `/exercises`:
 ```bash
 curl "http://localhost:3030/exercises?body_part=chest&equipment=barbell&limit=5"
 curl "http://localhost:3030/exercises?q=cintura"
-curl "http://localhost:3030/exercises/0025"
+curl "http://localhost:3030/exercises/7e17c4aa-9f2e-415e-8f9d-68789cf30570"
+curl "http://localhost:3030/body-parts?page=1&limit=10"
+curl "http://localhost:3030/filters?limit=100"
 ```
 
-Resposta da lista:
+Resposta de `/exercises`:
 
 ```json
 {
-  "data": [{ "id": "0025", "body_part": "chest", "equipment": "barbell", "muscles": {}, "i18n": {}, "media": {} }],
-  "total": 154,
+  "data": [{ "id": "7e17c4aa-9f2e-415e-8f9d-68789cf30570", "body_part": "waist", "equipment": "body_weight", "muscles": {}, "i18n": {}, "media": {} }],
+  "total": 1324,
   "page": 1,
   "limit": 5,
-  "totalPages": 31
+  "totalPages": 265
 }
 ```
+
+Resposta de `/body-parts`:
+
+```json
+{
+  "data": [{ "id": "chest", "labels": { "en": "chest", "es": "pecho", "pt-br": "peito" } }],
+  "total": 10,
+  "page": 1,
+  "limit": 10,
+  "totalPages": 1
+}
+```
+
+`/exercises/:id` e `/exercises/random` devolvem um único exercício, sem envelope.
 
 ## Uso
 
@@ -276,6 +318,8 @@ interface Exercise {
 ├── images/                    # thumbnails 180×180  (© Gym visual)
 ├── videos/                    # GIFs 180×180        (© Gym visual)
 ├── servidor/                  # API Express + SQLite
+├── openapi.yaml               # spec OpenAPI 3.1
+├── docs.html                  # referência Scalar
 ├── index.html                 # explorador
 ├── setup.html                 # guia de importação
 ├── LICENSE

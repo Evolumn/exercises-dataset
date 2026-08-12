@@ -1,0 +1,651 @@
+openapi: 3.1.0
+info:
+  title: Exercises API
+  version: 1.1.0
+  summary: Dataset de 1.324 exercícios com UUID, slugs estáveis e i18n.
+  description: |
+    API REST do dataset de exercícios.
+
+    - **Identidade** — `id` UUID v4; slugs na raiz (`body_part`, `equipment`, `muscles`)
+    - **Vocabulário** — rótulos em `/taxonomy` (`slug → { en, es, pt-br }`)
+    - **Conteúdo** — `i18n` só com `name` e `steps`
+    - **Paginação** — todo endpoint de coleção usa `page`/`limit` e o envelope `{ data, total, page, limit, totalPages }`
+
+    Idiomas: `pt-br`, `en`, `es`. Mídia © Gym visual, 180×180. Arquivos de mídia mantêm o prefixo numérico original.
+  license:
+    name: MIT (código e dados) + termos Gym visual (mídia)
+    identifier: MIT
+
+servers:
+  - url: http://localhost:3030
+    description: Local (`npm start`)
+
+tags:
+  - name: Exercícios
+    description: Lista, detalhe e exercício aleatório
+  - name: Taxonomia
+    description: Slugs com rótulos traduzidos
+  - name: Mídia
+    description: Thumbnails e GIFs
+
+paths:
+  /exercises:
+    get:
+      tags: [Exercícios]
+      operationId: listExercises
+      summary: Lista exercícios
+      description: Paginação com filtros por slug e busca textual (nome, passos, slugs e rótulos da taxonomia).
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/q'
+        - $ref: '#/components/parameters/search'
+        - $ref: '#/components/parameters/bodyPart'
+        - $ref: '#/components/parameters/equipment'
+        - $ref: '#/components/parameters/muscle'
+      responses:
+        '200':
+          description: Página de exercícios
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExercisePage'
+              examples:
+                padrao:
+                  summary: Primeira página
+                  value:
+                    data:
+                      - id: 7e17c4aa-9f2e-415e-8f9d-68789cf30570
+                        body_part: waist
+                        equipment: body_weight
+                        muscles:
+                          primary: [abs]
+                          secondary: [hip_flexors, lower_back]
+                        i18n:
+                          pt-br:
+                            name: 3/4 abdominal
+                            steps:
+                              - Deite-se de costas com os joelhos dobrados e os pés apoiados no chão.
+                          en:
+                            name: 3/4 sit-up
+                            steps:
+                              - Lie flat on your back with your knees bent and feet flat on the ground.
+                          es:
+                            name: 3/4 abdominal
+                            steps:
+                              - Túmbate sobre tu espalda con las rodillas flexionadas y los pies apoyados en el suelo.
+                        media:
+                          id: 2gPfomN
+                          thumbnail: images/0001-2gPfomN.jpg
+                          animation: videos/0001-2gPfomN.gif
+                          attribution: © Gym visual — https://gymvisual.com/
+                    total: 1324
+                    page: 1
+                    limit: 20
+                    totalPages: 67
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /exercises/{id}:
+    get:
+      tags: [Exercícios]
+      operationId: getExercise
+      summary: Busca um exercício
+      parameters:
+        - $ref: '#/components/parameters/exerciseId'
+      responses:
+        '200':
+          description: Exercício encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Exercise'
+              examples:
+                sitUp:
+                  $ref: '#/components/examples/ExerciseSitUp'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /exercises/random:
+    get:
+      tags: [Exercícios]
+      operationId: getRandomExercise
+      summary: Exercício aleatório
+      responses:
+        '200':
+          description: Um exercício
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Exercise'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /taxonomy:
+    get:
+      tags: [Taxonomia]
+      operationId: getTaxonomy
+      summary: Dicionário paginado
+      description: |
+        Mapa `slug → { en, es, pt-br }` para partes do corpo, equipamentos e músculos.
+        Cada grupo em `data` é fatiado com o mesmo `page`/`limit`. `total` é o maior dos três grupos.
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: Página da taxonomia
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaxonomyPage'
+              examples:
+                amostra:
+                  value:
+                    data:
+                      body_parts:
+                        waist:
+                          en: waist
+                          es: cintura
+                          pt-br: cintura
+                      equipment:
+                        body_weight:
+                          en: body weight
+                          es: peso corporal
+                          pt-br: peso corporal
+                      muscles:
+                        abs:
+                          en: abs
+                          es: abdomen
+                          pt-br: abdômen
+                    total: 43
+                    page: 1
+                    limit: 20
+                    totalPages: 3
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /filters:
+    get:
+      tags: [Taxonomia]
+      operationId: getFilters
+      summary: Valores distintos com rótulos
+      description: |
+        União de `/body-parts`, `/equipment` e `/muscles` — o que o explorador usa nos selects.
+        Cada grupo em `data` é fatiado com o mesmo `page`/`limit`. `total` é o maior dos três grupos.
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: Página de filtros
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FiltersPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /body-parts:
+    get:
+      tags: [Taxonomia]
+      operationId: listBodyParts
+      summary: Partes do corpo
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: Página de partes do corpo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabeledValuePage'
+              examples:
+                amostra:
+                  value:
+                    data:
+                      - id: chest
+                        labels: { en: chest, es: pecho, pt-br: peito }
+                      - id: waist
+                        labels: { en: waist, es: cintura, pt-br: cintura }
+                    total: 10
+                    page: 1
+                    limit: 10
+                    totalPages: 1
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /equipment:
+    get:
+      tags: [Taxonomia]
+      operationId: listEquipment
+      summary: Equipamentos
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: Página de equipamentos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabeledValuePage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /muscles:
+    get:
+      tags: [Taxonomia]
+      operationId: listMuscles
+      summary: Músculos
+      description: União dos slugs em `muscles.primary` e `muscles.secondary`.
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: Página de músculos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabeledValuePage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /images/{file}:
+    get:
+      tags: [Mídia]
+      operationId: getThumbnail
+      summary: Thumbnail 180×180
+      parameters:
+        - name: file
+          in: path
+          required: true
+          schema:
+            type: string
+            example: 0001-2gPfomN.jpg
+      responses:
+        '200':
+          description: JPEG
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                contentMediaType: image/jpeg
+        '404':
+          description: Arquivo não encontrado
+
+  /videos/{file}:
+    get:
+      tags: [Mídia]
+      operationId: getAnimation
+      summary: GIF 180×180
+      parameters:
+        - name: file
+          in: path
+          required: true
+          schema:
+            type: string
+            example: 0001-2gPfomN.gif
+      responses:
+        '200':
+          description: GIF
+          content:
+            image/gif:
+              schema:
+                type: string
+                contentMediaType: image/gif
+        '404':
+          description: Arquivo não encontrado
+
+components:
+  parameters:
+    page:
+      name: page
+      in: query
+      description: Página (≥ 1)
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+        example: 1
+    limit:
+      name: limit
+      in: query
+      description: Itens por página (máximo 100)
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+        example: 20
+    q:
+      name: q
+      in: query
+      description: Busca em nome, passos, slugs e rótulos da taxonomia
+      schema:
+        type: string
+        example: cintura
+    search:
+      name: search
+      in: query
+      description: Alias de `q`
+      schema:
+        type: string
+    bodyPart:
+      name: body_part
+      in: query
+      description: Slug da parte do corpo. Vários valores via vírgula.
+      schema:
+        type: string
+        example: chest
+    equipment:
+      name: equipment
+      in: query
+      description: Slug do equipamento. Vários valores via vírgula.
+      schema:
+        type: string
+        example: barbell
+    muscle:
+      name: muscle
+      in: query
+      description: Slug em `primary` ou `secondary`. Vários valores via vírgula.
+      schema:
+        type: string
+        example: abs
+    exerciseId:
+      name: id
+      in: path
+      required: true
+      description: UUID v4 do exercício
+      schema:
+        type: string
+        format: uuid
+        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        example: 7e17c4aa-9f2e-415e-8f9d-68789cf30570
+
+  responses:
+    BadRequest:
+      description: Parâmetro inválido
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            limit:
+              value: { error: limit must not be greater than 100 }
+            page:
+              value: { error: page must be a positive integer }
+    NotFound:
+      description: Recurso não encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Exercise not found
+
+  schemas:
+    Error:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    LocalizedText:
+      type: object
+      additionalProperties: false
+      required: [en, es, pt-br]
+      properties:
+        en:
+          type: string
+        es:
+          type: string
+        pt-br:
+          type: string
+
+    LocalizedContent:
+      type: object
+      additionalProperties: false
+      required: [name, steps]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        steps:
+          type: array
+          items:
+            type: string
+            minLength: 1
+
+    Muscles:
+      type: object
+      additionalProperties: false
+      required: [primary, secondary]
+      properties:
+        primary:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        secondary:
+          type: array
+          items:
+            type: string
+            minLength: 1
+
+    Media:
+      type: object
+      additionalProperties: false
+      required: [id, thumbnail, animation, attribution]
+      properties:
+        id:
+          type: string
+          minLength: 1
+        thumbnail:
+          type: string
+          pattern: '^images/.+\.(jpg|jpeg|png)$'
+        animation:
+          type: string
+          pattern: '^videos/.+\.gif$'
+        attribution:
+          type: string
+          minLength: 1
+
+    Exercise:
+      type: object
+      additionalProperties: false
+      required: [id, body_part, equipment, muscles, i18n, media]
+      properties:
+        id:
+          type: string
+          format: uuid
+          pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        body_part:
+          type: string
+          description: Slug estável. Rótulo em `/taxonomy`.
+        equipment:
+          type: string
+          description: Slug estável. Rótulo em `/taxonomy`.
+        muscles:
+          $ref: '#/components/schemas/Muscles'
+        i18n:
+          type: object
+          additionalProperties: false
+          required: [en, es, pt-br]
+          properties:
+            en:
+              $ref: '#/components/schemas/LocalizedContent'
+            es:
+              $ref: '#/components/schemas/LocalizedContent'
+            pt-br:
+              $ref: '#/components/schemas/LocalizedContent'
+        media:
+          $ref: '#/components/schemas/Media'
+
+    ExercisePage:
+      type: object
+      additionalProperties: false
+      required: [data, total, page, limit, totalPages]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Exercise'
+        total:
+          type: integer
+          minimum: 0
+        page:
+          type: integer
+          minimum: 1
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+        totalPages:
+          type: integer
+          minimum: 0
+
+    LabeledValuePage:
+      type: object
+      additionalProperties: false
+      required: [data, total, page, limit, totalPages]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/LabeledValue'
+        total:
+          type: integer
+          minimum: 0
+        page:
+          type: integer
+          minimum: 1
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+        totalPages:
+          type: integer
+          minimum: 0
+
+    TaxonomyPage:
+      type: object
+      additionalProperties: false
+      required: [data, total, page, limit, totalPages]
+      properties:
+        data:
+          $ref: '#/components/schemas/Taxonomy'
+        total:
+          type: integer
+          minimum: 0
+        page:
+          type: integer
+          minimum: 1
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+        totalPages:
+          type: integer
+          minimum: 0
+
+    FiltersPage:
+      type: object
+      additionalProperties: false
+      required: [data, total, page, limit, totalPages]
+      properties:
+        data:
+          $ref: '#/components/schemas/Filters'
+        total:
+          type: integer
+          minimum: 0
+        page:
+          type: integer
+          minimum: 1
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+        totalPages:
+          type: integer
+          minimum: 0
+
+    LabeledValue:
+      type: object
+      additionalProperties: false
+      required: [id, labels]
+      properties:
+        id:
+          type: string
+          description: Slug
+        labels:
+          $ref: '#/components/schemas/LocalizedText'
+
+    TaxonomyMap:
+      type: object
+      additionalProperties:
+        $ref: '#/components/schemas/LocalizedText'
+
+    Taxonomy:
+      type: object
+      additionalProperties: false
+      required: [body_parts, equipment, muscles]
+      properties:
+        body_parts:
+          $ref: '#/components/schemas/TaxonomyMap'
+        equipment:
+          $ref: '#/components/schemas/TaxonomyMap'
+        muscles:
+          $ref: '#/components/schemas/TaxonomyMap'
+
+    Filters:
+      type: object
+      additionalProperties: false
+      required: [body_parts, equipment, muscles]
+      properties:
+        body_parts:
+          type: array
+          items:
+            $ref: '#/components/schemas/LabeledValue'
+        equipment:
+          type: array
+          items:
+            $ref: '#/components/schemas/LabeledValue'
+        muscles:
+          type: array
+          items:
+            $ref: '#/components/schemas/LabeledValue'
+
+  examples:
+    ExerciseSitUp:
+      summary: 3/4 abdominal
+      value:
+        id: 7e17c4aa-9f2e-415e-8f9d-68789cf30570
+        body_part: waist
+        equipment: body_weight
+        muscles:
+          primary: [abs]
+          secondary: [hip_flexors, lower_back]
+        i18n:
+          pt-br:
+            name: 3/4 abdominal
+            steps:
+              - Deite-se de costas com os joelhos dobrados e os pés apoiados no chão.
+              - Coloque as mãos atrás da cabeça com os cotovelos apontando para fora.
+          en:
+            name: 3/4 sit-up
+            steps:
+              - Lie flat on your back with your knees bent and feet flat on the ground.
+          es:
+            name: 3/4 abdominal
+            steps:
+              - Túmbate sobre tu espalda con las rodillas flexionadas y los pies apoyados en el suelo.
+        media:
+          id: 2gPfomN
+          thumbnail: images/0001-2gPfomN.jpg
+          animation: videos/0001-2gPfomN.gif
+          attribution: © Gym visual — https://gymvisual.com/

@@ -1,6 +1,17 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const express = require('express');
+const { mountDocs } = require('./docs');
+const {
+  DEFAULT_PAGE,
+  DEFAULT_LIMIT,
+  MAX_LIMIT,
+  pageOffset,
+  paginated,
+  paginateList,
+  paginateRecord,
+  paginateGrouped,
+} = require('./pagination');
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -201,6 +212,21 @@ function labeledValues(ids, dictionary) {
   }));
 }
 
+function readPagination(query) {
+  const page = parsePositiveInteger(getSingleQueryValue(query, 'page'), 'page') ?? DEFAULT_PAGE;
+  const limit = parsePositiveInteger(getSingleQueryValue(query, 'limit'), 'limit') ?? DEFAULT_LIMIT;
+  if (limit > MAX_LIMIT) {
+    throw new HttpError(400, `limit must not be greater than ${MAX_LIMIT}`);
+  }
+
+  const offset = pageOffset(page, limit);
+  if (!Number.isSafeInteger(offset)) {
+    throw new HttpError(400, 'page is too large');
+  }
+
+  return { page, limit, offset };
+}
+
 function createApp(db) {
   const app = express();
   const projectRoot = path.join(__dirname, '..');
@@ -245,16 +271,7 @@ function createApp(db) {
   });
 
   app.get('/exercises', (req, res) => {
-    const page = parsePositiveInteger(getSingleQueryValue(req.query, 'page'), 'page') ?? 1;
-    const limit = parsePositiveInteger(getSingleQueryValue(req.query, 'limit'), 'limit') ?? 20;
-    if (limit > 100) {
-      throw new HttpError(400, 'limit must not be greater than 100');
-    }
-    const offset = (page - 1) * limit;
-    if (!Number.isSafeInteger(offset)) {
-      throw new HttpError(400, 'page is too large');
-    }
-
+    const { page, limit, offset } = readPagination(req.query);
     const filters = buildFilters(req.query, taxonomy);
     const total = db.prepare(`SELECT COUNT(*) AS total FROM exercises ${filters.sql}`).get(...filters.params).total;
     const rows = db.prepare(`
@@ -264,13 +281,7 @@ function createApp(db) {
       LIMIT ? OFFSET ?
     `).all(...filters.params, limit, offset);
 
-    res.json({
-      data: rows.map(serializeExercise),
-      total,
-      page,
-      limit,
-      totalPages: total === 0 ? 0 : Math.ceil(total / limit),
-    });
+    res.json(paginated(rows.map(serializeExercise), { page, limit, total }));
   });
 
   const getDistinctValues = (column) => {
@@ -295,25 +306,36 @@ function createApp(db) {
     return rows.map((row) => row.value);
   };
 
-  app.get('/taxonomy', (_req, res) => {
-    res.json(taxonomy);
+  app.get('/taxonomy', (req, res) => {
+    const { page, limit } = readPagination(req.query);
+    res.json(paginateGrouped({
+      body_parts: taxonomy.body_parts,
+      equipment: taxonomy.equipment,
+      muscles: taxonomy.muscles,
+    }, page, limit, paginateRecord));
   });
-  app.get('/body-parts', (_req, res) => {
-    res.json(labeledValues(getDistinctValues('body_part'), taxonomy.body_parts));
+  app.get('/body-parts', (req, res) => {
+    const { page, limit } = readPagination(req.query);
+    res.json(paginateList(labeledValues(getDistinctValues('body_part'), taxonomy.body_parts), page, limit));
   });
-  app.get('/equipment', (_req, res) => {
-    res.json(labeledValues(getDistinctValues('equipment'), taxonomy.equipment));
+  app.get('/equipment', (req, res) => {
+    const { page, limit } = readPagination(req.query);
+    res.json(paginateList(labeledValues(getDistinctValues('equipment'), taxonomy.equipment), page, limit));
   });
-  app.get('/muscles', (_req, res) => {
-    res.json(labeledValues(getDistinctMuscles(), taxonomy.muscles));
+  app.get('/muscles', (req, res) => {
+    const { page, limit } = readPagination(req.query);
+    res.json(paginateList(labeledValues(getDistinctMuscles(), taxonomy.muscles), page, limit));
   });
-  app.get('/filters', (_req, res) => {
-    res.json({
+  app.get('/filters', (req, res) => {
+    const { page, limit } = readPagination(req.query);
+    res.json(paginateGrouped({
       body_parts: labeledValues(getDistinctValues('body_part'), taxonomy.body_parts),
       equipment: labeledValues(getDistinctValues('equipment'), taxonomy.equipment),
       muscles: labeledValues(getDistinctMuscles(), taxonomy.muscles),
-    });
+    }, page, limit, paginateList));
   });
+
+  mountDocs(app, projectRoot);
 
   app.use((_req, _res, next) => {
     next(new HttpError(404, 'Route not found'));
