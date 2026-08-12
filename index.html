@@ -377,9 +377,9 @@
 
   <script>
     const PAGE_SIZE = 24;
-    const API_BASE = /localhost:3030|127\.0\.0\.1:3030/.test(location.origin)
-      ? ""
-      : "http://localhost:3030";
+    const API_BASE = location.protocol === "file:"
+      ? "http://localhost:3030"
+      : "";
     const LANG = "pt-br";
     const LANGS = [
       { code: "pt-br", label: "Português" },
