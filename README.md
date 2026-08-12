@@ -451,3 +451,42 @@ This repository is a **developer setup wizard and structured exercise dataset** 
 - **Code, tooling, dataset structure, and instruction text** are released under the [MIT License](LICENSE).
 - **Exercise media (images & GIFs) is © [Gym visual](https://gymvisual.com/)** and redistributed here **with permission**, at 180×180 resolution — see [`NOTICE.md`](NOTICE.md) and the media exception in [`LICENSE`](LICENSE). Keep the `© Gym visual — https://gymvisual.com/` attribution intact. Reuse is governed by [Gym visual's Terms & Conditions](https://gymvisual.com/content/3-terms-and-conditions-of-use); obtain your own license there before reusing the media.
 - This repository does **not** claim ownership of the underlying exercise content or media.
+
+---
+
+## REST API with SQLite
+
+This repository also includes a Node.js/Express API backed by SQLite. The API exposes instructions in English, Spanish and Brazilian Portuguese. The first server start creates `data/exercises.db` and imports `data/exercises.json` in a transaction. Re-running the import updates existing records by `id` without creating duplicates.
+
+Leia o [Guia de Consumo da API](API-GUIDE.md) para exemplos completos de filtros, paginacao, idiomas, midia e integracao JavaScript.
+
+Para importar este dataset em outro projeto, use o [Guia de Importacao para Agentes](AGENT-IMPORT-GUIDE.md), que inclui sincronizacao completa, upsert, validacao, retry e copia opcional das midias.
+
+### Setup
+
+```bash
+npm install
+node index.js
+```
+
+The API listens on `http://localhost:3000` by default. You can configure it with:
+
+- `PORT` — HTTP port, default `3000`
+- `DB_PATH` — SQLite file, default `./data/exercises.db`
+- `DATA_PATH` — JSON dataset, default `./data/exercises.json`
+- `ALLOWED_ORIGINS` — comma-separated CORS origins; when omitted, all origins are allowed
+
+To import the dataset without starting the API, run `npm run import`.
+
+Available endpoints:
+
+- `GET /exercises`
+- `GET /exercises/:id`
+- `GET /exercises/random`
+- `GET /categories`
+- `GET /body-parts`
+- `GET /equipment`
+- `GET /targets`
+- `GET /filters`
+- `GET /images/<arquivo>.jpg`
+- `GET /videos/<arquivo>.gif`
