@@ -1,4 +1,16 @@
 services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    networks:
+      - dokploy-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   api:
     build: .
     image: exercises-api:1.0.0
@@ -11,7 +23,11 @@ services:
       PORT: "3030"
       DB_PATH: /data/exercises.db
       DATA_PATH: /app/data/exercises.json
+      REDIS_URL: redis://redis:6379
       # ALLOWED_ORIGINS: https://seu-dominio.com
+    depends_on:
+      redis:
+        condition: service_healthy
     volumes:
       - exercises-db:/data
     networks:

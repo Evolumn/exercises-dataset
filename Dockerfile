@@ -14,7 +14,8 @@ WORKDIR /app
 ENV NODE_ENV=production \
     PORT=3030 \
     DB_PATH=/data/exercises.db \
-    DATA_PATH=/app/data/exercises.json
+    DATA_PATH=/app/data/exercises.json \
+    REDIS_URL=redis://redis:6379
 
 RUN mkdir -p /data /app/data \
   && chown node:node /data

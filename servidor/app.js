@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const express = require('express');
 const { mountDocs } = require('./docs');
+const { createCacheMiddleware, staticCacheOptions } = require('./cache');
 const logger = require('./logger');
 const {
   DEFAULT_PAGE,
@@ -228,7 +229,7 @@ function readPagination(query) {
   return { page, limit, offset };
 }
 
-function createApp(db) {
+function createApp(db, cache) {
   const app = express();
   const projectRoot = path.join(__dirname, '..');
   const taxonomy = loadTaxonomy(projectRoot);
@@ -267,8 +268,9 @@ function createApp(db) {
 
   app.use(createCorsMiddleware());
   app.use(express.json({ limit: '1mb' }));
-  app.use('/images', express.static(path.join(projectRoot, 'images')));
-  app.use('/videos', express.static(path.join(projectRoot, 'videos')));
+  app.use('/images', express.static(path.join(projectRoot, 'images'), staticCacheOptions));
+  app.use('/videos', express.static(path.join(projectRoot, 'videos'), staticCacheOptions));
+  app.use(createCacheMiddleware(cache));
   app.get('/', (_req, res) => {
     res.sendFile(path.join(projectRoot, 'index.html'));
   });
